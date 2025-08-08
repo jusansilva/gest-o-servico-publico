@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protótipo de Gestão Municipal</title>
+    <!-- Adiciona o script do Tailwind CSS para estilização rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'primary-blue': '#2563EB',
+                        'secondary-green': '#10B981',
+                        'accent-orange': '#F59E0B',
+                        'gray-text': '#4B5563',
+                        'gray-bg': '#F3F4F6',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Inclui os ícones do Lucide React para consistência visual -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        /* Estilos adicionais para ícones do Lucide */
+        .lucide {
+            display: inline-block;
+        }
+        /* Estilo para simular o mapa */
+        .map-placeholder {
+            background-image: url('https://placehold.co/1200x600/E5E7EB/4B5563?text=Mapa+da+Cidade');
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-bg font-sans text-gray-text min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <div class="w-full max-w-7xl bg-white rounded-2xl shadow-xl p-6 md:p-10 mb-8">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4 md:mb-0">Gestão Pública 360</h1>
+            <div class="flex space-x-2 md:space-x-4">
+                <button id="btn-cidadao" class="view-btn bg-primary-blue text-white font-semibold py-2 px-4 md:px-6 rounded-full shadow hover:bg-blue-700 transition">Cidadão</button>
+                <button id="btn-gestor" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 md:px-6 rounded-full shadow hover:bg-gray-300 transition">Gestor</button>
+                <button id="btn-equipe" class="view-btn bg-gray-200 text-gray-700 font-semibold py-2 px-4 md:px-6 rounded-full shadow hover:bg-gray-300 transition">Equipe</button>
+            </div>
+        </header>
+
+        <main id="app-container" class="transition-opacity duration-500">
+            <!-- As interfaces serão renderizadas aqui pelo JavaScript -->
+        </main>
+    </div>
+
+    <!-- Scripts do Lucide para renderizar os ícones -->
+    <script>
+        lucide.createIcons();
+    </script>
+
+    <script>
+        // Dados simulados para o protótipo
+        const simulatedData = {
+            metrics: {
+                resolved: 1247,
+                satisfaction: 89,
+                avgTime: 2.3,
+                activeTeams: 15
+            },
+            calls: [
+                { id: 1, category: 'Iluminação', description: 'Poste com lâmpada queimada na Rua das Flores', status: 'pendente', assigned: null, location: 'Rua das Flores, 123', priority: 'Média' },
+                { id: 2, category: 'Vias', description: 'Buraco na Avenida Principal', status: 'em andamento', assigned: 'Equipe Pavimentação B', location: 'Avenida Principal, 45', priority: 'Alta' },
+                { id: 3, category: 'Limpeza', description: 'Lixo acumulado na praça central', status: 'resolvido', assigned: 'Equipe Limpeza D', location: 'Praça da Sé', priority: 'Baixa' },
+                { id: 4, category: 'Meio Ambiente', description: 'Árvore caída obstruindo a rua', status: 'pendente', assigned: null, location: 'Rua do Bosque, 789', priority: 'Alta' },
+            ],
+            teams: [
+                { id: 'Equipe Elétrica A', members: 3 },
+                { id: 'Equipe Pavimentação B', members: 4 },
+                { id: 'Equipe Poda C', members: 2 },
+                { id: 'Equipe Limpeza D', members: 5 },
+            ],
+            userHistory: [
+                { id: 5, category: 'Iluminação', description: 'Lâmpada queimada na minha rua', status: 'resolvido', date: '01/08/2025' },
+                { id: 6, category: 'Vias', description: 'Rua esburacada', status: 'em andamento', date: '05/08/2025' },
+            ],
+            teamTasks: [
+                { id: 7, priority: 'Alta', description: 'Reparar buraco na Avenida Principal', status: 'em andamento', location: 'Avenida Principal, 45' },
+                { id: 8, priority: 'Média', description: 'Substituir lâmpada queimada na Rua das Flores', status: 'pendente', location: 'Rua das Flores, 123' },
+            ]
+        };
+
+        // Estado da aplicação para gerenciar a visualização atual
+        let currentView = 'cidadao';
+
+        // Elementos DOM
+        const appContainer = document.getElementById('app-container');
+        const viewButtons = document.querySelectorAll('.view-btn');
+
+        // Função para renderizar a interface do Cidadão
+        function renderCidadao() {
+            appContainer.innerHTML = `
+                <div class="space-y-8">
+                    <h2 class="text-2xl font-bold text-gray-800">Aplicativo do Cidadão</h2>
+
+                    <!-- Seção de Reportar Problema -->
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
+                        <h3 class="text-xl font-semibold mb-4">Reportar um novo problema</h3>
+                        <form id="report-form" class="space-y-4">
+                            <div>
+                                <label for="category" class="block text-sm font-medium text-gray-700">Categoria</label>
+                                <select id="category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue">
+                                    <option value="Iluminação">Iluminação</option>
+                                    <option value="Vias">Vias</option>
+                                    <option value="Limpeza">Limpeza</option>
+                                    <option value="Meio Ambiente">Meio Ambiente</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
+                                <textarea id="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue"></textarea>
+                            </div>
+                            <div>
+                                <label for="photo" class="block text-sm font-medium text-gray-700">Upload de foto</label>
+                                <input type="file" id="photo" class="mt-1 block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-primary-blue file:text-white
+                                hover:file:bg-blue-700 cursor-pointer">
+                            </div>
+                            <button type="submit" class="w-full bg-secondary-green text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-green-600 transition">
+                                Enviar Chamado
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Seção de Acompanhamento de Chamados -->
+                    <div class="p-6 rounded-xl shadow-inner">
+                        <h3 class="text-xl font-semibold mb-4">Seu Histórico de Chamados</h3>
+                        <div class="space-y-4">
+                            ${simulatedData.userHistory.map(call => `
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium text-lg">${call.category} - #${call.id}</span>
+                                        <span class="text-sm font-semibold px-2 py-1 rounded-full ${call.status === 'resolvido' ? 'bg-secondary-green text-white' : 'bg-accent-orange text-white'}">
+                                            ${call.status.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">${call.description}</p>
+                                    <p class="text-xs text-gray-400 mt-2">Data: ${call.date}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                </div>
+            `;
+            // Adiciona listener para o formulário de reportar problema
+            document.getElementById('report-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                // Captura os dados do formulário
+                const category = document.getElementById('category').value;
+                const description = document.getElementById('description').value;
+                const date = new Date().toLocaleDateString('pt-BR');
+                // Cria novo chamado
+                const newCall = {
+                    id: simulatedData.calls.length + 1, // Garante ID único para todos os chamados
+                    category,
+                    description,
+                    status: 'pendente',
+                    assigned: null,
+                    location: 'Não informado', // Você pode adicionar um campo de localização no formulário se quiser
+                    priority: 'Média' // Ou defina conforme desejar
+                };
+                // Adiciona ao histórico do usuário
+                simulatedData.userHistory.unshift({
+                    id: newCall.id,
+                    category: newCall.category,
+                    description: newCall.description,
+                    status: newCall.status,
+                    date
+                });
+                // Adiciona à lista de chamados do gestor
+                simulatedData.calls.push(newCall);
+                // Adiciona à lista de tarefas da equipe
+                simulatedData.teamTasks.push({
+                    id: newCall.id,
+                    priority: newCall.priority,
+                    description: newCall.description,
+                    status: newCall.status,
+                    location: newCall.location
+                });
+                // Re-renderiza a interface para atualizar o histórico
+                renderCidadao();
+                alert('Chamado enviado com sucesso! Você pode acompanhar o status na seção Histórico.');
+            });
+        }
+
+        // Função para renderizar a interface do Gestor
+        function renderGestor() {
+            appContainer.innerHTML = `
+                <div class="space-y-8">
+                    <h2 class="text-2xl font-bold text-gray-800">Painel do Gestor</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
+                            <div class="flex justify-center mb-2"><i class="lucide lucide-check-circle text-secondary-green w-8 h-8"></i></div>
+                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.resolved}</p>
+                            <p class="text-sm text-gray-500">Chamados Resolvidos</p>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
+                            <div class="flex justify-center mb-2"><i class="lucide lucide-smile text-primary-blue w-8 h-8"></i></div>
+                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.satisfaction}%</p>
+                            <p class="text-sm text-gray-500">Taxa de Satisfação</p>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
+                            <div class="flex justify-center mb-2"><i class="lucide lucide-clock text-accent-orange w-8 h-8"></i></div>
+                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.avgTime}h</p>
+                            <p class="text-sm text-gray-500">Tempo Médio de Resolução</p>
+                        </div>
+                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
+                            <div class="flex justify-center mb-2"><i class="lucide lucide-users text-gray-700 w-8 h-8"></i></div>
+                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.activeTeams}</p>
+                            <p class="text-sm text-gray-500">Equipes Ativas</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-sm overflow-x-auto">
+                        <h3 class="text-xl font-semibold mb-4">Gestão de Chamados</h3>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridade</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Atribuído</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                ${simulatedData.calls.map(call => `
+                                    <tr>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${call.id}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">${call.description}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                                call.status === 'resolvido' ? 'bg-green-100 text-green-800' :
+                                                call.status === 'em andamento' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-yellow-100 text-yellow-800'
+                                            }">
+                                                ${call.status.charAt(0).toUpperCase() + call.status.slice(1)}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${call.priority}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">${call.assigned || 'N/A'}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button class="text-primary-blue hover:text-blue-900 enviar-equipe-btn" data-id="${call.id}"><i class="lucide lucide-send w-5 h-5"></i> Enviar para Equipe</button>
+                                            <button class="text-secondary-green hover:text-green-900 iniciar-btn ml-2" data-id="${call.id}"><i class="lucide lucide-play w-5 h-5"></i> Iniciar</button>
+                                            <button class="text-secondary-green hover:text-green-900 finalizar-btn ml-2" data-id="${call.id}"><i class="lucide lucide-check w-5 h-5"></i> Finalizar</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+
+            document.querySelectorAll('.enviar-equipe-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    const chamado = simulatedData.calls.find(c => c.id === id);
+                    if (chamado && !simulatedData.teamTasks.some(t => t.id === id)) {
+                        simulatedData.teamTasks.push({
+                            id: chamado.id,
+                            priority: chamado.priority,
+                            description: chamado.description,
+                            status: chamado.status,
+                            location: chamado.location
+                        });
+                        alert('Chamado enviado para equipe!');
+                        renderGestor();
+                    }
+                };
+            });
+
+            document.querySelectorAll('.iniciar-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    atualizarStatusChamado(id, 'em andamento');
+                };
+            });
+
+            document.querySelectorAll('.finalizar-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    atualizarStatusChamado(id, 'resolvido');
+                };
+            });
+        }
+
+        function atualizarStatusChamado(id, novoStatus) {
+            const chamado = simulatedData.calls.find(c => c.id === id);
+            if (chamado) chamado.status = novoStatus;
+            const tarefa = simulatedData.teamTasks.find(t => t.id === id);
+            if (tarefa) tarefa.status = novoStatus;
+            const historico = simulatedData.userHistory.find(h => h.id === id);
+            if (historico) historico.status = novoStatus;
+            renderGestor();
+            if (currentView === 'equipe') renderEquipe();
+            if (currentView === 'cidadao') renderCidadao();
+        }
+
+        function renderEquipe() {
+            appContainer.innerHTML = `
+                <div class="space-y-8">
+                    <h2 class="text-2xl font-bold text-gray-800">App da Equipe de Campo</h2>
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
+                        <h3 class="text-xl font-semibold mb-4">Minhas Tarefas do Dia</h3>
+                        <div class="space-y-4">
+                            ${simulatedData.teamTasks.map(task => `
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-100 transition" onclick="showTaskDetails(${task.id})">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium text-lg">${task.description}</span>
+                                        <span class="text-sm font-semibold px-2 py-1 rounded-full ${
+                                            task.priority === 'Alta' ? 'bg-red-100 text-red-800' :
+                                            task.priority === 'Média' ? 'bg-accent-orange text-orange-800' :
+                                            'bg-green-100 text-green-800'
+                                        }">
+                                            ${task.priority.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600 flex items-center">
+                                        <i class="lucide lucide-map-pin w-4 h-4 mr-2"></i> ${task.location}
+                                    </p>
+                                    <p class="text-sm text-gray-600 mt-2 flex items-center">
+                                        <i class="lucide lucide-trending-up w-4 h-4 mr-2"></i> Status: ${task.status}
+                                    </p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div id="task-detail-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4">
+                        <div class="relative bg-white p-6 rounded-xl shadow-xl max-w-lg w-full">
+                            <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-900" onclick="hideTaskDetails()">
+                                <i class="lucide lucide-x w-6 h-6"></i>
+                            </button>
+                            <h3 class="text-2xl font-bold mb-4">Detalhes da Tarefa</h3>
+                            <div class="space-y-4">
+                                <p class="text-lg font-semibold" id="task-title"></p>
+                                <p id="task-location"></p>
+                                <p id="task-status"></p>
+                                <div class="space-y-2">
+                                    <h4 class="font-medium">Ações:</h4>
+                                    <div class="flex flex-col space-y-2 md:flex-row md:space-x-2 md:space-y-0">
+                                        <button class="bg-primary-blue text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-blue-700 transition" id="btn-iniciar">
+                                            <i class="lucide lucide-play w-4 h-4 inline mr-2"></i> Iniciar
+                                        </button>
+                                        <button class="bg-secondary-green text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-green-600 transition" id="btn-finalizar">
+                                            <i class="lucide lucide-check w-4 h-4 inline mr-2"></i> Finalizar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-100 p-4 rounded-lg">
+                                    <h4 class="font-medium mb-2">Registrar Evidência (Fotos)</h4>
+                                    <input type="file" multiple class="block w-full text-sm text-gray-500
+                                        file:mr-4 file:py-2 file:px-4
+                                        file:rounded-full file:border-0
+                                        file:text-sm file:font-semibold
+                                        file:bg-primary-blue file:text-white
+                                        hover:file:bg-blue-700 cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function showTaskDetails(taskId) {
+            const task = simulatedData.teamTasks.find(t => t.id === taskId);
+            if (task) {
+                document.getElementById('task-title').textContent = task.description;
+                document.getElementById('task-location').textContent = `Local: ${task.location}`;
+                document.getElementById('task-status').textContent = `Status: ${task.status}`;
+                document.getElementById('task-detail-modal').classList.remove('hidden');
+                document.getElementById('btn-iniciar').onclick = () => atualizarStatusChamado(taskId, 'em andamento');
+                document.getElementById('btn-finalizar').onclick = () => atualizarStatusChamado(taskId, 'resolvido');
+            }
+        }
+
+        function hideTaskDetails() {
+            document.getElementById('task-detail-modal').classList.add('hidden');
+        }
+
+        function renderCidadao() {
+            appContainer.innerHTML = `
+                <div class="space-y-8">
+                    <h2 class="text-2xl font-bold text-gray-800">Aplicativo do Cidadão</h2>
+                    <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
+                        <h3 class="text-xl font-semibold mb-4">Reportar um novo problema</h3>
+                        <form id="report-form" class="space-y-4">
+                            <div>
+                                <label for="category" class="block text-sm font-medium text-gray-700">Categoria</label>
+                                <select id="category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue">
+                                    <option value="Iluminação">Iluminação</option>
+                                    <option value="Vias">Vias</option>
+                                    <option value="Limpeza">Limpeza</option>
+                                    <option value="Meio Ambiente">Meio Ambiente</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
+                                <textarea id="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue"></textarea>
+                            </div>
+                            <div>
+                                <label for="photo" class="block text-sm font-medium text-gray-700">Upload de foto</label>
+                                <input type="file" id="photo" class="mt-1 block w-full text-sm text-gray-500
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-primary-blue file:text-white
+                                hover:file:bg-blue-700 cursor-pointer">
+                            </div>
+                            <button type="submit" class="w-full bg-secondary-green text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-green-600 transition">
+                                Enviar Chamado
+                            </button>
+                        </form>
+                    </div>
+                    <div class="p-6 rounded-xl shadow-inner">
+                        <h3 class="text-xl font-semibold mb-4">Seu Histórico de Chamados</h3>
+                        <div class="space-y-4">
+                            ${simulatedData.userHistory.map(call => `
+                                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span class="font-medium text-lg">${call.category} - #${call.id}</span>
+                                        <span class="text-sm font-semibold px-2 py-1 rounded-full ${call.status === 'resolvido' ? 'bg-secondary-green text-white' : 'bg-accent-orange text-white'}">
+                                            ${call.status.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">${call.description}</p>
+                                    <p class="text-xs text-gray-400 mt-2">Data: ${call.date}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('report-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const category = document.getElementById('category').value;
+                const description = document.getElementById('description').value;
+                const date = new Date().toLocaleDateString('pt-BR');
+                const newCall = {
+                    id: simulatedData.calls.length + 1,
+                    category,
+                    description,
+                    status: 'pendente',
+                    assigned: null,
+                    location: 'Não informado',
+                    priority: 'Média'
+                };
+                simulatedData.userHistory.unshift({
+                    id: newCall.id,
+                    category: newCall.category,
+                    description: newCall.description,
+                    status: newCall.status,
+                    date
+                });
+                simulatedData.calls.push(newCall);
+                renderCidadao();
+                alert('Chamado enviado com sucesso! Você pode acompanhar o status na seção Histórico.');
+            });
+        }
+
+        // Função para alternar a visualização da aplicação
+        function switchView(view) {
+            currentView = view;
+            viewButtons.forEach(btn => {
+                if (btn.id.includes(view)) {
+                    btn.classList.add('bg-primary-blue', 'text-white');
+                    btn.classList.remove('bg-gray-200', 'text-gray-700');
+                } else {
+                    btn.classList.remove('bg-primary-blue', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                }
+            });
+
+            // Adiciona um fade-out suave antes de renderizar a nova view
+            appContainer.style.opacity = '0';
+            setTimeout(() => {
+                if (currentView === 'cidadao') {
+                    renderCidadao();
+                } else if (currentView === 'gestor') {
+                    renderGestor();
+                } else if (currentView === 'equipe') {
+                    renderEquipe();
+                }
+                appContainer.style.opacity = '1';
+            }, 300); // Tempo do fade-out
+        }
+
+        // Adiciona event listeners aos botões
+        document.getElementById('btn-cidadao').addEventListener('click', () => switchView('cidadao'));
+        document.getElementById('btn-gestor').addEventListener('click', () => switchView('gestor'));
+        document.getElementById('btn-equipe').addEventListener('click', () => switchView('equipe'));
+
+        // Renderiza a view inicial ao carregar a página
+        window.onload = function() {
+            switchView('cidadao');
+        }
+    </script>
+</body>
+</html>
