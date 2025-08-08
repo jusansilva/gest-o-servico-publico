@@ -62,35 +62,58 @@
     </script>
 
     <script>
-        // Dados simulados para o protótipo
-        const simulatedData = {
-            metrics: {
-                resolved: 1247,
-                satisfaction: 89,
-                avgTime: 2.3,
-                activeTeams: 15
-            },
-            calls: [
-                { id: 1, category: 'Iluminação', description: 'Poste com lâmpada queimada na Rua das Flores', status: 'pendente', assigned: null, location: 'Rua das Flores, 123', priority: 'Média' },
-                { id: 2, category: 'Vias', description: 'Buraco na Avenida Principal', status: 'em andamento', assigned: 'Equipe Pavimentação B', location: 'Avenida Principal, 45', priority: 'Alta' },
-                { id: 3, category: 'Limpeza', description: 'Lixo acumulado na praça central', status: 'resolvido', assigned: 'Equipe Limpeza D', location: 'Praça da Sé', priority: 'Baixa' },
-                { id: 4, category: 'Meio Ambiente', description: 'Árvore caída obstruindo a rua', status: 'pendente', assigned: null, location: 'Rua do Bosque, 789', priority: 'Alta' },
-            ],
-            teams: [
-                { id: 'Equipe Elétrica A', members: 3 },
-                { id: 'Equipe Pavimentação B', members: 4 },
-                { id: 'Equipe Poda C', members: 2 },
-                { id: 'Equipe Limpeza D', members: 5 },
-            ],
-            userHistory: [
-                { id: 5, category: 'Iluminação', description: 'Lâmpada queimada na minha rua', status: 'resolvido', date: '01/08/2025' },
-                { id: 6, category: 'Vias', description: 'Rua esburacada', status: 'em andamento', date: '05/08/2025' },
-            ],
-            teamTasks: [
-                { id: 7, priority: 'Alta', description: 'Reparar buraco na Avenida Principal', status: 'em andamento', location: 'Avenida Principal, 45' },
-                { id: 8, priority: 'Média', description: 'Substituir lâmpada queimada na Rua das Flores', status: 'pendente', location: 'Rua das Flores, 123' },
-            ]
-        };
+        // Substitua as funções de localStorage por IndexDB
+
+        // Função para abrir/criar o banco
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('gestaoDB', 1);
+                request.onupgradeneeded = function(e) {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('gestaoData')) {
+                        db.createObjectStore('gestaoData', { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = function(e) {
+                    resolve(e.target.result);
+                };
+                request.onerror = function(e) {
+                    reject(e.target.error);
+                };
+            });
+        }
+
+        // Função para salvar dados
+        async function saveData() {
+            const db = await openDB();
+            const tx = db.transaction('gestaoData', 'readwrite');
+            const store = tx.objectStore('gestaoData');
+            await store.put({ id: 1, ...simulatedData });
+            await tx.complete;
+        }
+
+        // Função para carregar dados
+        async function getData() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('gestaoData', 'readonly');
+                const store = tx.objectStore('gestaoData');
+                const request = store.get(1);
+                request.onsuccess = function(e) {
+                    resolve(e.target.result || initialData);
+                };
+                request.onerror = function(e) {
+                    resolve(initialData);
+                };
+            });
+        }
+
+        // Inicialização assíncrona
+        let simulatedData;
+        getData().then(data => {
+            simulatedData = data;
+            switchView('cidadao');
+        });
 
         // Estado da aplicação para gerenciar a visualização atual
         let currentView = 'cidadao';
@@ -124,12 +147,12 @@
                             </div>
                             <div>
                                 <label for="photo" class="block text-sm font-medium text-gray-700">Upload de foto</label>
-                                <input type="file" id="photo" class="mt-1 block w-full text-sm text-gray-500
-                                file:mr-4 file:py-2 file:px-4
-                                file:rounded-full file:border-0
-                                file:text-sm file:font-semibold
-                                file:bg-primary-blue file:text-white
-                                hover:file:bg-blue-700 cursor-pointer">
+                                <input type="file" id="photo" accept="image/*" class="mt-1 block w-full text-sm text-gray-500
+                                    file:mr-4 file:py-2 file:px-4
+                                    file:rounded-full file:border-0
+                                    file:text-sm file:font-semibold
+                                    file:bg-primary-blue file:text-white
+                                    hover:file:bg-blue-700 cursor-pointer">
                             </div>
                             <button type="submit" class="w-full bg-secondary-green text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-green-600 transition">
                                 Enviar Chamado
@@ -151,6 +174,7 @@
                                     </div>
                                     <p class="text-sm text-gray-600">${call.description}</p>
                                     <p class="text-xs text-gray-400 mt-2">Data: ${call.date}</p>
+                                    ${call.photo ? `<img src="${call.photo}" alt="Foto do chamado" class="w-24 rounded-lg mt-2 cursor-pointer" onclick="ampliarFoto('${call.photo}')">` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -158,45 +182,66 @@
 
                 </div>
             `;
-            // Adiciona listener para o formulário de reportar problema
             document.getElementById('report-form').addEventListener('submit', (e) => {
                 e.preventDefault();
-                // Captura os dados do formulário
                 const category = document.getElementById('category').value;
                 const description = document.getElementById('description').value;
                 const date = new Date().toLocaleDateString('pt-BR');
-                // Cria novo chamado
+                const photoInput = document.getElementById('photo');
+                const file = photoInput.files[0];
+
+                function limparFormulario() {
+                    document.getElementById('category').selectedIndex = 0;
+                    document.getElementById('description').value = '';
+                    document.getElementById('photo').value = '';
+                }
+
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        cadastrarChamado(category, description, date, evt.target.result);
+                        limparFormulario();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    cadastrarChamado(category, description, date, null);
+                    limparFormulario();
+                }
+            });
+
+            // Função para cadastrar chamado (usada no cidadão)
+            async function cadastrarChamado(category, description, date, photo) {
+                if (!confirm('Deseja realmente enviar este chamado?')) return;
                 const newCall = {
-                    id: simulatedData.calls.length + 1, // Garante ID único para todos os chamados
+                    id: Date.now(),
                     category,
                     description,
                     status: 'pendente',
                     assigned: null,
-                    location: 'Não informado', // Você pode adicionar um campo de localização no formulário se quiser
-                    priority: 'Média' // Ou defina conforme desejar
+                    location: 'Não informado',
+                    priority: 'Média',
+                    photo
                 };
-                // Adiciona ao histórico do usuário
                 simulatedData.userHistory.unshift({
                     id: newCall.id,
                     category: newCall.category,
                     description: newCall.description,
                     status: newCall.status,
-                    date
+                    date,
+                    photo
                 });
-                // Adiciona à lista de chamados do gestor
                 simulatedData.calls.push(newCall);
-                // Adiciona à lista de tarefas da equipe
-                simulatedData.teamTasks.push({
-                    id: newCall.id,
-                    priority: newCall.priority,
-                    description: newCall.description,
-                    status: newCall.status,
-                    location: newCall.location
-                });
-                // Re-renderiza a interface para atualizar o histórico
+                await saveData();
                 renderCidadao();
+                hideModalChamado(); // Fecha o modal após enviar
                 alert('Chamado enviado com sucesso! Você pode acompanhar o status na seção Histórico.');
-            });
+            }
+
+            // Função para fechar o modal de chamado
+            function hideModalChamado() {
+                const modal = document.getElementById('modal-chamado');
+                if (modal) modal.classList.add('hidden');
+            }
         }
 
         // Função para renderizar a interface do Gestor
@@ -204,28 +249,6 @@
             appContainer.innerHTML = `
                 <div class="space-y-8">
                     <h2 class="text-2xl font-bold text-gray-800">Painel do Gestor</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
-                            <div class="flex justify-center mb-2"><i class="lucide lucide-check-circle text-secondary-green w-8 h-8"></i></div>
-                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.resolved}</p>
-                            <p class="text-sm text-gray-500">Chamados Resolvidos</p>
-                        </div>
-                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
-                            <div class="flex justify-center mb-2"><i class="lucide lucide-smile text-primary-blue w-8 h-8"></i></div>
-                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.satisfaction}%</p>
-                            <p class="text-sm text-gray-500">Taxa de Satisfação</p>
-                        </div>
-                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
-                            <div class="flex justify-center mb-2"><i class="lucide lucide-clock text-accent-orange w-8 h-8"></i></div>
-                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.avgTime}h</p>
-                            <p class="text-sm text-gray-500">Tempo Médio de Resolução</p>
-                        </div>
-                        <div class="bg-gray-50 p-6 rounded-xl shadow-sm text-center">
-                            <div class="flex justify-center mb-2"><i class="lucide lucide-users text-gray-700 w-8 h-8"></i></div>
-                            <p class="text-3xl font-bold text-gray-800">${simulatedData.metrics.activeTeams}</p>
-                            <p class="text-sm text-gray-500">Equipes Ativas</p>
-                        </div>
-                    </div>
                     <div class="bg-white p-6 rounded-xl shadow-sm overflow-x-auto">
                         <h3 class="text-xl font-semibold mb-4">Gestão de Chamados</h3>
                         <table class="min-w-full divide-y divide-gray-200">
@@ -243,7 +266,10 @@
                                 ${simulatedData.calls.map(call => `
                                     <tr>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#${call.id}</td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">${call.description}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">
+                                            ${call.description}
+                                            ${call.photo ? `<img src="${call.photo}" alt="Foto do chamado" class="w-24 rounded-lg mt-2 cursor-pointer" onclick="ampliarFoto('${call.photo}')">` : ''}
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                                 call.status === 'resolvido' ? 'bg-green-100 text-green-800' :
@@ -256,9 +282,14 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${call.priority}</td>
                                         <td class="px-6 py-4 text-sm text-gray-500">${call.assigned || 'N/A'}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <select class="prioridade-select mr-2" data-id="${call.id}">
+                                                <option value="Alta">Alta</option>
+                                                <option value="Média" selected>Média</option>
+                                                <option value="Baixa">Baixa</option>
+                                            </select>
                                             <button class="text-primary-blue hover:text-blue-900 enviar-equipe-btn" data-id="${call.id}"><i class="lucide lucide-send w-5 h-5"></i> Enviar para Equipe</button>
-                                            <button class="text-secondary-green hover:text-green-900 iniciar-btn ml-2" data-id="${call.id}"><i class="lucide lucide-play w-5 h-5"></i> Iniciar</button>
-                                            <button class="text-secondary-green hover:text-green-900 finalizar-btn ml-2" data-id="${call.id}"><i class="lucide lucide-check w-5 h-5"></i> Finalizar</button>
+                                            <button class="text-secondary-green hover:text-green-900 iniciar-btn ml-2" data-id="${call.id}" ${call.status === 'em andamento' || call.status === 'resolvido' ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}><i class="lucide lucide-play w-5 h-5"></i> Iniciar</button>
+                                            <button class="text-secondary-green hover:text-green-900 finalizar-btn ml-2" data-id="${call.id}" ${call.status !== 'em andamento' ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}><i class="lucide lucide-check w-5 h-5"></i> Finalizar</button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -273,15 +304,27 @@
                 btn.onclick = function() {
                     const id = Number(this.dataset.id);
                     const chamado = simulatedData.calls.find(c => c.id === id);
-                    if (chamado && !simulatedData.teamTasks.some(t => t.id === id)) {
-                        simulatedData.teamTasks.push({
-                            id: chamado.id,
-                            priority: chamado.priority,
-                            description: chamado.description,
-                            status: chamado.status,
-                            location: chamado.location
-                        });
-                        alert('Chamado enviado para equipe!');
+                    const prioridadeSelect = document.querySelector(`.prioridade-select[data-id="${id}"]`);
+                    const prioridade = prioridadeSelect ? prioridadeSelect.value : chamado.priority;
+                    let tarefaEquipe = simulatedData.teamTasks.find(t => t.id === id);
+
+                    // Adiciona confirmação antes de enviar
+                    if (!confirm('Deseja realmente enviar este chamado para a equipe?')) return;
+
+                    if (chamado) {
+                        if (!tarefaEquipe) {
+                            simulatedData.teamTasks.push({
+                                id: chamado.id,
+                                priority: prioridade,
+                                description: chamado.description,
+                                status: chamado.status,
+                                location: chamado.location
+                            });
+                        } else {
+                            tarefaEquipe.priority = prioridade;
+                        }
+                        saveData();
+                        alert('Chamado enviado para equipe com prioridade ' + prioridade + '!');
                         renderGestor();
                     }
                 };
@@ -302,13 +345,23 @@
             });
         }
 
+        // Função para atualizar status do chamado com confirmação
         function atualizarStatusChamado(id, novoStatus) {
+            let mensagem = '';
+            if (novoStatus === 'em andamento') {
+                mensagem = 'Deseja realmente iniciar este chamado?';
+            } else if (novoStatus === 'resolvido') {
+                mensagem = 'Deseja realmente finalizar este chamado?';
+            }
+            if (!confirm(mensagem)) return;
+
             const chamado = simulatedData.calls.find(c => c.id === id);
             if (chamado) chamado.status = novoStatus;
             const tarefa = simulatedData.teamTasks.find(t => t.id === id);
             if (tarefa) tarefa.status = novoStatus;
             const historico = simulatedData.userHistory.find(h => h.id === id);
             if (historico) historico.status = novoStatus;
+            saveData();
             renderGestor();
             if (currentView === 'equipe') renderEquipe();
             if (currentView === 'cidadao') renderCidadao();
@@ -345,7 +398,7 @@
                     </div>
                     <div id="task-detail-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center p-4">
                         <div class="relative bg-white p-6 rounded-xl shadow-xl max-w-lg w-full">
-                            <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-900" onclick="hideTaskDetails()">
+                            <button class="absolute top-4 right-4 text-gray-500 hover:text-gray-900" id="btn-close-modal">
                                 <i class="lucide lucide-x w-6 h-6"></i>
                             </button>
                             <h3 class="text-2xl font-bold mb-4">Detalhes da Tarefa</h3>
@@ -353,6 +406,7 @@
                                 <p class="text-lg font-semibold" id="task-title"></p>
                                 <p id="task-location"></p>
                                 <p id="task-status"></p>
+                                <div id="task-photo-area"></div>
                                 <div class="space-y-2">
                                     <h4 class="font-medium">Ações:</h4>
                                     <div class="flex flex-col space-y-2 md:flex-row md:space-x-2 md:space-y-0">
@@ -365,8 +419,8 @@
                                     </div>
                                 </div>
                                 <div class="bg-gray-100 p-4 rounded-lg">
-                                    <h4 class="font-medium mb-2">Registrar Evidência (Fotos)</h4>
-                                    <input type="file" multiple class="block w-full text-sm text-gray-500
+                                    <h4 class="font-medium mb-2">Registrar Evidência (Foto)</h4>
+                                    <input type="file" id="task-photo-input" accept="image/*" class="block w-full text-sm text-gray-500
                                         file:mr-4 file:py-2 file:px-4
                                         file:rounded-full file:border-0
                                         file:text-sm file:font-semibold
@@ -379,6 +433,50 @@
                 </div>
             `;
             lucide.createIcons();
+
+            document.querySelectorAll('.enviar-equipe-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    const chamado = simulatedData.calls.find(c => c.id === id);
+                    const prioridadeSelect = document.querySelector(`.prioridade-select[data-id="${id}"]`);
+                    const prioridade = prioridadeSelect ? prioridadeSelect.value : chamado.priority;
+                    let tarefaEquipe = simulatedData.teamTasks.find(t => t.id === id);
+
+                    // Adiciona confirmação antes de enviar
+                    if (!confirm('Deseja realmente enviar este chamado para a equipe?')) return;
+
+                    if (chamado) {
+                        if (!tarefaEquipe) {
+                            simulatedData.teamTasks.push({
+                                id: chamado.id,
+                                priority: prioridade,
+                                description: chamado.description,
+                                status: chamado.status,
+                                location: chamado.location
+                            });
+                        } else {
+                            tarefaEquipe.priority = prioridade;
+                        }
+                        saveData();
+                        alert('Chamado enviado para equipe com prioridade ' + prioridade + '!');
+                        renderGestor();
+                    }
+                };
+            });
+
+            document.querySelectorAll('.iniciar-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    atualizarStatusChamado(id, 'em andamento');
+                };
+            });
+
+            document.querySelectorAll('.finalizar-btn').forEach(btn => {
+                btn.onclick = function() {
+                    const id = Number(this.dataset.id);
+                    atualizarStatusChamado(id, 'resolvido');
+                };
+            });
         }
 
         function showTaskDetails(taskId) {
@@ -388,8 +486,63 @@
                 document.getElementById('task-location').textContent = `Local: ${task.location}`;
                 document.getElementById('task-status').textContent = `Status: ${task.status}`;
                 document.getElementById('task-detail-modal').classList.remove('hidden');
-                document.getElementById('btn-iniciar').onclick = () => atualizarStatusChamado(taskId, 'em andamento');
-                document.getElementById('btn-finalizar').onclick = () => atualizarStatusChamado(taskId, 'resolvido');
+
+                // Botões de ação
+                const btnIniciar = document.getElementById('btn-iniciar');
+                const btnFinalizar = document.getElementById('btn-finalizar');
+
+                if (task.status === 'pendente') {
+                    btnIniciar.style.display = 'inline-block';
+                    btnFinalizar.style.display = 'none';
+                } else if (task.status === 'em andamento') {
+                    btnIniciar.style.display = 'none';
+                    btnFinalizar.style.display = 'inline-block';
+                } else {
+                    btnIniciar.style.display = 'none';
+                    btnFinalizar.style.display = 'none';
+                }
+
+                btnIniciar.onclick = () => {
+                    if (confirm('Deseja realmente iniciar este chamado?')) {
+                        atualizarStatusChamado(taskId, 'em andamento');
+                        hideTaskDetails(); // Fecha o modal após confirmação
+                    }
+                };
+                btnFinalizar.onclick = () => {
+                    if (confirm('Deseja realmente finalizar este chamado?')) {
+                        atualizarStatusChamado(taskId, 'resolvido');
+                        hideTaskDetails(); // Fecha o modal após confirmação
+                    }
+                };
+
+                const photoArea = document.getElementById('task-photo-area');
+                photoArea.innerHTML = '';
+                if (task.photo) {
+                    photoArea.innerHTML = `<img src="${task.photo}" alt="Foto da tarefa" class="w-full rounded-lg mb-2">`;
+                } else {
+                    const chamado = simulatedData.calls.find(c => c.id === taskId);
+                    if (chamado && chamado.photo) {
+                        photoArea.innerHTML = `<img src="${chamado.photo}" alt="Foto do chamado" class="w-full rounded-lg mb-2">`;
+                    }
+                }
+
+                const photoInput = document.getElementById('task-photo-input');
+                photoInput.value = '';
+                photoInput.onchange = function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function(evt) {
+                            task.photo = evt.target.result;
+                            saveData();
+                            showTaskDetails(taskId);
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+
+                document.getElementById('btn-close-modal').onclick = hideTaskDetails;
+                lucide.createIcons();
             }
         }
 
@@ -397,84 +550,35 @@
             document.getElementById('task-detail-modal').classList.add('hidden');
         }
 
-        function renderCidadao() {
-            appContainer.innerHTML = `
-                <div class="space-y-8">
-                    <h2 class="text-2xl font-bold text-gray-800">Aplicativo do Cidadão</h2>
-                    <div class="bg-gray-50 p-6 rounded-xl shadow-inner">
-                        <h3 class="text-xl font-semibold mb-4">Reportar um novo problema</h3>
-                        <form id="report-form" class="space-y-4">
-                            <div>
-                                <label for="category" class="block text-sm font-medium text-gray-700">Categoria</label>
-                                <select id="category" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue">
-                                    <option value="Iluminação">Iluminação</option>
-                                    <option value="Vias">Vias</option>
-                                    <option value="Limpeza">Limpeza</option>
-                                    <option value="Meio Ambiente">Meio Ambiente</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="description" class="block text-sm font-medium text-gray-700">Descrição</label>
-                                <textarea id="description" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-blue focus:ring-primary-blue"></textarea>
-                            </div>
-                            <div>
-                                <label for="photo" class="block text-sm font-medium text-gray-700">Upload de foto</label>
-                                <input type="file" id="photo" class="mt-1 block w-full text-sm text-gray-500
-                                file:mr-4 file:py-2 file:px-4
-                                file:rounded-full file:border-0
-                                file:text-sm file:font-semibold
-                                file:bg-primary-blue file:text-white
-                                hover:file:bg-blue-700 cursor-pointer">
-                            </div>
-                            <button type="submit" class="w-full bg-secondary-green text-white font-semibold py-2 px-4 rounded-full shadow hover:bg-green-600 transition">
-                                Enviar Chamado
-                            </button>
-                        </form>
-                    </div>
-                    <div class="p-6 rounded-xl shadow-inner">
-                        <h3 class="text-xl font-semibold mb-4">Seu Histórico de Chamados</h3>
-                        <div class="space-y-4">
-                            ${simulatedData.userHistory.map(call => `
-                                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                                    <div class="flex justify-between items-center mb-2">
-                                        <span class="font-medium text-lg">${call.category} - #${call.id}</span>
-                                        <span class="text-sm font-semibold px-2 py-1 rounded-full ${call.status === 'resolvido' ? 'bg-secondary-green text-white' : 'bg-accent-orange text-white'}">
-                                            ${call.status.toUpperCase()}
-                                        </span>
-                                    </div>
-                                    <p class="text-sm text-gray-600">${call.description}</p>
-                                    <p class="text-xs text-gray-400 mt-2">Data: ${call.date}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.getElementById('report-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                const category = document.getElementById('category').value;
-                const description = document.getElementById('description').value;
-                const date = new Date().toLocaleDateString('pt-BR');
-                const newCall = {
-                    id: simulatedData.calls.length + 1,
-                    category,
-                    description,
-                    status: 'pendente',
-                    assigned: null,
-                    location: 'Não informado',
-                    priority: 'Média'
-                };
-                simulatedData.userHistory.unshift({
-                    id: newCall.id,
-                    category: newCall.category,
-                    description: newCall.description,
-                    status: newCall.status,
-                    date
-                });
-                simulatedData.calls.push(newCall);
-                renderCidadao();
-                alert('Chamado enviado com sucesso! Você pode acompanhar o status na seção Histórico.');
-            });
+        // Fecha o modal ao clicar fora da área de conteúdo
+        document.addEventListener('mousedown', function(event) {
+            const modal = document.getElementById('task-detail-modal');
+            if (modal && !modal.classList.contains('hidden')) {
+                const modalContent = modal.querySelector('.relative.bg-white');
+                if (modalContent && !modalContent.contains(event.target)) {
+                    hideTaskDetails();
+                }
+            }
+        });
+
+        // Função global para ampliar foto
+        function ampliarFoto(src) {
+            const modal = document.getElementById('photo-modal');
+            const img = document.getElementById('photo-modal-img');
+            img.src = src;
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+            document.getElementById('btn-close-photo-modal').onclick = function() {
+                modal.classList.add('hidden');
+                img.src = '';
+            };
+            // Fecha ao clicar fora da imagem/modal
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    img.src = '';
+                }
+            };
         }
 
         // Função para alternar a visualização da aplicação
@@ -513,6 +617,30 @@
         window.onload = function() {
             switchView('cidadao');
         }
+
+        // Dados simulados iniciais
+        const initialData = {
+            metrics: {
+                resolved: 0,
+                satisfaction: 0,
+                avgTime: 0,
+                activeTeams: 0
+            },
+            calls: [],
+            teams: [],
+            userHistory: [],
+            teamTasks: []
+        };
     </script>
+
+    <!-- Adicione logo após o app-container -->
+    <div id="photo-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="relative bg-white rounded-xl p-4 max-w-2xl w-full flex flex-col items-center">
+            <button class="absolute top-2 right-2 text-gray-500 hover:text-gray-900" id="btn-close-photo-modal">
+                <i class="lucide lucide-x w-8 h-8"></i>
+            </button>
+            <img id="photo-modal-img" src="" alt="Foto ampliada" class="max-w-full max-h-[80vh] rounded-lg">
+        </div>
+    </div>
 </body>
 </html>
